@@ -5,6 +5,7 @@
  */
 
 import type { Express } from 'express';
+import express from 'express';
 import type { Server } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -66,14 +67,14 @@ export function serveStatic(app: Express) {
   // Serve static assets
   app.use(
     '/assets',
-    (await import('express')).static(path.join(distPath, 'assets'), {
+    express.static(path.join(distPath, 'assets'), {
       maxAge: '1y',
       immutable: true,
     })
   );
   
   // Serve other static files
-  app.use((await import('express')).static(distPath));
+  app.use(express.static(distPath));
   
   // Handle SPA routing
   app.get('*', (req, res, next) => {

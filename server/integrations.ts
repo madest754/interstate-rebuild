@@ -268,7 +268,7 @@ export async function initiateCallout(options: PhoneCalloutOptions): Promise<{ s
     });
 
     if (response.ok) {
-      const result = await response.json();
+      const result = await response.json() as { callId?: string };
       return { success: true, callId: result.callId };
     }
 
@@ -320,7 +320,7 @@ export async function aiChat(options: AiChatOptions): Promise<string | null> {
       return null;
     }
 
-    const result = await response.json();
+    const result = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
     return result.choices?.[0]?.message?.content || null;
   } catch (error) {
     console.error('OpenAI error:', error);
@@ -414,7 +414,7 @@ export async function aiOcrExtract(base64Image: string): Promise<string | null> 
       return null;
     }
 
-    const result = await response.json();
+    const result = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
     return result.choices?.[0]?.message?.content || null;
   } catch (error) {
     console.error('OCR error:', error);
@@ -442,7 +442,13 @@ export async function geocodeAddress(address: string): Promise<{
       `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
     );
 
-    const result = await response.json();
+    const result = await response.json() as { 
+      status: string; 
+      results?: Array<{ 
+        geometry: { location: { lat: number; lng: number } }; 
+        formatted_address: string 
+      }> 
+    };
 
     if (result.status === 'OK' && result.results?.[0]) {
       const location = result.results[0].geometry.location;
@@ -472,7 +478,10 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string |
       `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`
     );
 
-    const result = await response.json();
+    const result = await response.json() as { 
+      status: string; 
+      results?: Array<{ formatted_address: string }> 
+    };
 
     if (result.status === 'OK' && result.results?.[0]) {
       return result.results[0].formatted_address;
