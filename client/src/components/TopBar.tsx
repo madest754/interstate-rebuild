@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Menu, 
-  LogOut, 
   User, 
   Bell, 
   Settings, 
@@ -36,31 +34,14 @@ interface TopBarProps {
 
 export function TopBar({ user, currentPage, onNavigate }: TopBarProps) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const queryClient = useQueryClient();
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Logout failed');
-    },
-    onSuccess: () => {
-      queryClient.setQueryData(['user'], null);
-      queryClient.invalidateQueries();
-    },
-  });
-
-  const isDispatcher = user.role === 'admin' || user.role === 'dispatcher';
-  const isAdmin = user.role === 'admin';
-
+  // All nav items visible - no auth restrictions
   const navItems = [
     { id: 'dashboard' as Page, icon: Home, label: 'Dashboard', show: true },
-    { id: 'new-call' as Page, icon: Plus, label: 'New Call', show: isDispatcher },
+    { id: 'new-call' as Page, icon: Plus, label: 'New Call', show: true },
     { id: 'members' as Page, icon: Users, label: 'Directory', show: true },
-    { id: 'schedule' as Page, icon: Calendar, label: 'Schedule', show: isDispatcher },
-    { id: 'admin' as Page, icon: Shield, label: 'Admin', show: isAdmin },
+    { id: 'schedule' as Page, icon: Calendar, label: 'Schedule', show: true },
+    { id: 'admin' as Page, icon: Shield, label: 'Admin', show: true },
     { id: 'settings' as Page, icon: Settings, label: 'Settings', show: true },
   ].filter(item => item.show);
 
@@ -122,30 +103,23 @@ export function TopBar({ user, currentPage, onNavigate }: TopBarProps) {
 
           {/* Right - User menu */}
           <div className="flex items-center gap-2">
-            <button className="p-2 hover:bg-blue-600 rounded-lg relative">
-              <Bell className="h-5 w-5" />
-              {/* Notification badge */}
-              {/* <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full" /> */}
-            </button>
-            
-            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-blue-600">
-              <div className="text-right">
-                <p className="text-sm font-medium">
-                  {user.firstName || user.email.split('@')[0]}
-                </p>
-                <p className="text-xs text-blue-200">
-                  {user.unitNumber || user.role}
-                </p>
-              </div>
-              
-              <button
-                onClick={() => logoutMutation.mutate()}
-                className="p-2 hover:bg-blue-600 rounded-lg"
-                title="Logout"
-              >
-                <LogOut className="h-5 w-5" />
+            {/* User info */}
+            <>
+              <button className="p-2 hover:bg-blue-600 rounded-lg relative">
+                <Bell className="h-5 w-5" />
               </button>
-            </div>
+              
+              <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-blue-600">
+                <div className="text-right">
+                  <p className="text-sm font-medium">
+                    {user.firstName || user.email.split('@')[0]}
+                  </p>
+                  <p className="text-xs text-blue-200">
+                    {user.unitNumber || user.role}
+                  </p>
+                </div>
+              </div>
+            </>
           </div>
         </div>
       </header>
@@ -174,19 +148,32 @@ export function TopBar({ user, currentPage, onNavigate }: TopBarProps) {
               </button>
             </div>
             
-            {/* User info */}
+            {/* User info / Guest mode */}
             <div className="p-4 border-b bg-slate-50">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <User className="h-5 w-5 text-blue-600" />
+                  {isGuest ? (
+                    <Eye className="h-5 w-5 text-blue-600" />
+                  ) : (
+                    <User className="h-5 w-5 text-blue-600" />
+                  )}
                 </div>
                 <div>
-                  <p className="font-medium">
-                    {user.firstName} {user.lastName}
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    {user.unitNumber || user.role}
-                  </p>
+                  {isGuest ? (
+                    <>
+                      <p className="font-medium">Read-Only Mode</p>
+                      <p className="text-sm text-slate-500">Viewing calls & directory</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {user.unitNumber || user.role}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -217,18 +204,6 @@ export function TopBar({ user, currentPage, onNavigate }: TopBarProps) {
                 );
               })}
             </nav>
-            
-            {/* Logout */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => logoutMutation.mutate()}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
           </div>
         </div>
       )}

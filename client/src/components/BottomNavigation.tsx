@@ -6,18 +6,19 @@ type Page = 'dashboard' | 'new-call' | 'members' | 'schedule' | 'admin' | 'setti
 interface BottomNavigationProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
-  isDispatcher: boolean;
-  isAdmin: boolean;
+  isDispatcher?: boolean;
+  isAdmin?: boolean;
 }
 
-export function BottomNavigation({ currentPage, onNavigate, isDispatcher, isAdmin }: BottomNavigationProps) {
+export function BottomNavigation({ currentPage, onNavigate }: BottomNavigationProps) {
+  // All nav items always visible - no auth restrictions
   const navItems = [
-    { id: 'dashboard' as Page, icon: Home, label: 'Dashboard', show: true },
-    { id: 'new-call' as Page, icon: Plus, label: 'New Call', show: isDispatcher },
-    { id: 'members' as Page, icon: Users, label: 'Directory', show: true },
-    { id: 'schedule' as Page, icon: Calendar, label: 'Schedule', show: isDispatcher },
-    { id: 'admin' as Page, icon: Shield, label: 'Admin', show: isAdmin },
-  ].filter(item => item.show);
+    { id: 'dashboard' as Page, icon: Home, label: 'Dashboard' },
+    { id: 'new-call' as Page, icon: Plus, label: 'New Call' },
+    { id: 'members' as Page, icon: Users, label: 'Directory' },
+    { id: 'schedule' as Page, icon: Calendar, label: 'Schedule' },
+    { id: 'admin' as Page, icon: Shield, label: 'Admin' },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:hidden z-40">
