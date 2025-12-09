@@ -3,13 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 
 // Pages
-import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
-import CallForm from './pages/CallForm';
 import MembersPage from './pages/MembersPage';
 import SchedulePage from './pages/SchedulePage';
-import AdminPage from './pages/AdminPage';
-import SettingsPage from './pages/SettingsPage';
 
 // Components
 import { BottomNavigation } from './components/BottomNavigation';
@@ -19,7 +15,6 @@ import { OfflineBanner } from './components/ConnectionStatus';
 import { Toaster } from './components/ui/toaster';
 
 // Hooks
-import { useWebSocket } from './hooks/useWebSocket';
 import { usePrefetchReferenceData } from './hooks/useReferenceData';
 
 // Types
@@ -42,10 +37,20 @@ interface AuthContextType {
   refetch: () => void;
 }
 
+// Guest user for read-only mode
+const GUEST_USER: User = {
+  id: 'guest',
+  email: 'guest@chaveirim.org',
+  role: 'member',
+  memberId: null,
+  firstName: 'Guest',
+  lastName: 'User',
+};
+
 // Auth context
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  isLoading: true,
+  user: GUEST_USER,
+  isLoading: false,
   isAuthenticated: false,
   isAdmin: false,
   isDispatcher: false,
@@ -54,8 +59,8 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-// Simple router state
-type Page = 'dashboard' | 'new-call' | 'members' | 'schedule' | 'admin' | 'settings' | 'call-edit';
+// Simple router state - limited pages for guest mode
+type Page = 'dashboard' | 'members' | 'schedule';
 
 // Register service worker
 function registerServiceWorker() {
@@ -75,53 +80,36 @@ function registerServiceWorker() {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
-  const [editCallId, setEditCallId] = useState<string | null>(null);
 
   // Register service worker on mount
   useEffect(() => {
     registerServiceWorker();
   }, []);
 
-  // Fetch current user
-  const { data: user, isLoading, refetch } = useQuery<User | null>({
+  // Try to fetch user (will fail in serverless mode, that's ok)
+  const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ['user'],
     queryFn: async () => {
-      const res = await fetch('/api/user', { credentials: 'include' });
-      if (!res.ok) return null;
-      return res.json();
+      try {
+        const res = await fetch('/api/user', { credentials: 'include' });
+        if (!res.ok) return null;
+        return res.json();
+      } catch {
+        return null;
+      }
     },
     retry: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Prefetch reference data when user is authenticated
+  // Prefetch reference data
   usePrefetchReferenceData();
 
-  // Connect to WebSocket when authenticated
-  useWebSocket({ enabled: !!user });
-
-  // Compute auth values
+  // Use guest user if not authenticated
+  const activeUser = user || GUEST_USER;
   const isAuthenticated = !!user;
   const isAdmin = user?.role === 'admin';
   const isDispatcher = user?.role === 'admin' || user?.role === 'dispatcher';
-
-  // Navigate to call edit
-  const handleEditCall = (callId: string) => {
-    setEditCallId(callId);
-    setCurrentPage('call-edit');
-  };
-
-  // Navigate back to dashboard
-  const handleBack = () => {
-    setEditCallId(null);
-    setCurrentPage('dashboard');
-  };
-
-  // Navigate to new call
-  const handleNewCall = () => {
-    setEditCallId(null);
-    setCurrentPage('new-call');
-  };
 
   // Loading state
   if (isLoading) {
@@ -135,50 +123,46 @@ export default function App() {
     );
   }
 
-  // Not authenticated - show login
-  if (!user) {
-    return (
-      <ErrorBoundary>
-        <LoginPage onSuccess={refetch} />
-        <Toaster />
-      </ErrorBoundary>
-    );
-  }
-
-  // Render current page
+  // Render current page - limited for guest mode
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
-      case 'new-call':
-        return isDispatcher ? <CallForm onBack={handleBack} /> : <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
-      case 'call-edit':
-        return isDispatcher && editCallId ? <CallForm callId={editCallId} onBack={handleBack} /> : <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
+        return <Dashboard onEditCall={() => {}} onNewCall={() => {}} />;
       case 'members':
         return <MembersPage />;
       case 'schedule':
         return <SchedulePage />;
-      case 'admin':
-        return isAdmin ? <AdminPage /> : <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
-      case 'settings':
-        return <SettingsPage />;
       default:
-        return <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
+        return <Dashboard onEditCall={() => {}} onNewCall={() => {}} />;
     }
   };
 
   return (
     <ErrorBoundary>
-      <AuthContext.Provider value={{ user, isLoading, isAuthenticated, isAdmin, isDispatcher, refetch }}>
+      <AuthContext.Provider value={{ 
+        user: activeUser, 
+        isLoading, 
+        isAuthenticated, 
+        isAdmin, 
+        isDispatcher, 
+        refetch: () => {} 
+      }}>
         <div className="min-h-screen bg-slate-50 flex flex-col">
           {/* Offline banner */}
           <OfflineBanner />
           
+          {/* Read-only banner for guest mode */}
+          {!isAuthenticated && (
+            <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 text-center text-amber-800 text-sm">
+              👁️ Read-only mode - Login disabled in serverless deployment
+            </div>
+          )}
+          
           {/* Top bar */}
           <TopBar 
-            user={user} 
+            user={activeUser} 
             currentPage={currentPage}
-            onNavigate={setCurrentPage}
+            onNavigate={(page) => setCurrentPage(page as Page)}
           />
           
           {/* Main content */}
@@ -188,12 +172,12 @@ export default function App() {
             </ErrorBoundary>
           </main>
           
-          {/* Bottom navigation (mobile) */}
+          {/* Bottom navigation (mobile) - limited options */}
           <BottomNavigation 
             currentPage={currentPage}
-            onNavigate={setCurrentPage}
-            isDispatcher={isDispatcher}
-            isAdmin={isAdmin}
+            onNavigate={(page) => setCurrentPage(page as Page)}
+            isDispatcher={false}
+            isAdmin={false}
           />
           
           {/* Toast notifications */}
