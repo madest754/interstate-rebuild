@@ -17,7 +17,6 @@ import { TopBar } from './components/TopBar';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineBanner } from './components/ConnectionStatus';
 import { Toaster } from './components/ui/toaster';
-import { ToastProvider } from './hooks/useToast';
 
 // Hooks
 import { useWebSocket } from './hooks/useWebSocket';
@@ -140,10 +139,8 @@ export default function App() {
   if (!user) {
     return (
       <ErrorBoundary>
-        <ToastProvider>
-          <LoginPage onSuccess={refetch} />
-          <Toaster />
-        </ToastProvider>
+        <LoginPage onSuccess={refetch} />
+        <Toaster />
       </ErrorBoundary>
     );
   }
@@ -173,37 +170,35 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthContext.Provider value={{ user, isLoading, isAuthenticated, isAdmin, isDispatcher, refetch }}>
-        <ToastProvider>
-          <div className="min-h-screen bg-slate-50 flex flex-col">
-            {/* Offline banner */}
-            <OfflineBanner />
-            
-            {/* Top bar */}
-            <TopBar 
-              user={user} 
-              currentPage={currentPage}
-              onNavigate={setCurrentPage}
-            />
-            
-            {/* Main content */}
-            <main className="flex-1 pb-20 md:pb-4 overflow-auto">
-              <ErrorBoundary>
-                {renderPage()}
-              </ErrorBoundary>
-            </main>
-            
-            {/* Bottom navigation (mobile) */}
-            <BottomNavigation 
-              currentPage={currentPage}
-              onNavigate={setCurrentPage}
-              isDispatcher={isDispatcher}
-              isAdmin={isAdmin}
-            />
-            
-            {/* Toast notifications */}
-            <Toaster />
-          </div>
-        </ToastProvider>
+        <div className="min-h-screen bg-slate-50 flex flex-col">
+          {/* Offline banner */}
+          <OfflineBanner />
+          
+          {/* Top bar */}
+          <TopBar 
+            user={user} 
+            currentPage={currentPage}
+            onNavigate={setCurrentPage}
+          />
+          
+          {/* Main content */}
+          <main className="flex-1 pb-20 md:pb-4 overflow-auto">
+            <ErrorBoundary>
+              {renderPage()}
+            </ErrorBoundary>
+          </main>
+          
+          {/* Bottom navigation (mobile) */}
+          <BottomNavigation 
+            currentPage={currentPage}
+            onNavigate={setCurrentPage}
+            isDispatcher={isDispatcher}
+            isAdmin={isAdmin}
+          />
+          
+          {/* Toast notifications */}
+          <Toaster />
+        </div>
       </AuthContext.Provider>
     </ErrorBoundary>
   );

@@ -16,8 +16,10 @@ export { CallCard, CallList } from './CallCard';
 
 // Form Components
 export { default as MemberSearch, MemberMultiSelect, MemberBadge } from './MemberSearch';
-export { default as LocationPicker, LocationDisplay, type LocationData, type LocationType } from './LocationPicker';
-export { default as VehiclePicker, VehicleDisplay, QuickVehicleEntry, ColorPicker, type VehicleData } from './VehiclePicker';
+export { default as LocationPicker, LocationDisplay } from './LocationPicker';
+export type { LocationData, LocationType } from './LocationPicker';
+export { default as VehiclePicker, VehicleDisplay, QuickVehicleEntry, ColorPicker } from './VehiclePicker';
+export type { VehicleData } from './VehiclePicker';
 export { default as GooglePlacesAutocomplete, ManualAddressInput } from './GooglePlacesAutocomplete';
 
 // Status Components

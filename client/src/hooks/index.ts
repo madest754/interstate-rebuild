@@ -88,9 +88,7 @@ export {
 
 // Toast
 export {
-  ToastProvider,
   useToast,
-  setToastRef,
   toast,
   type Toast,
 } from './useToast';

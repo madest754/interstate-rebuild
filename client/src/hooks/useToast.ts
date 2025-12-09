@@ -1,99 +1,126 @@
 /**
- * Toast Hook
+ * useToast Hook
  * 
- * Simple toast notification system using React state.
+ * Simple toast notification system using a global state pattern.
+ * No JSX in this file - all rendering happens in the Toaster component.
  */
 
-import { useState, useCallback, createContext, useContext, ReactNode } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export interface Toast {
   id: string;
   type: 'success' | 'error' | 'warning' | 'info';
-  message: string;
+  title: string;
+  message?: string;
   duration?: number;
 }
 
-interface ToastContextType {
-  toasts: Toast[];
-  addToast: (toast: Omit<Toast, 'id'>) => void;
-  removeToast: (id: string) => void;
-  success: (message: string) => void;
-  error: (message: string) => void;
-  warning: (message: string) => void;
-  info: (message: string) => void;
+type ToastInput = Omit<Toast, 'id'>;
+
+// Global toast state
+let toastListeners: Array<(toasts: Toast[]) => void> = [];
+let toastState: Toast[] = [];
+let toastIdCounter = 0;
+
+function notifyListeners() {
+  toastListeners.forEach(listener => listener([...toastState]));
 }
 
-const ToastContext = createContext<ToastContextType | undefined>(undefined);
+function addToastGlobal(toast: ToastInput): string {
+  const id = `toast-${++toastIdCounter}`;
+  const newToast: Toast = { ...toast, id };
+  toastState = [...toastState, newToast];
+  notifyListeners();
+  
+  // Auto-remove after duration
+  const duration = toast.duration ?? 5000;
+  if (duration > 0) {
+    setTimeout(() => {
+      removeToastGlobal(id);
+    }, duration);
+  }
+  
+  return id;
+}
 
-let toastId = 0;
+function removeToastGlobal(id: string) {
+  toastState = toastState.filter(t => t.id !== id);
+  notifyListeners();
+}
 
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+// Global toast functions for use outside React components
+export const toast = {
+  success: (title: string, message?: string) => 
+    addToastGlobal({ type: 'success', title, message }),
+  error: (title: string, message?: string) => 
+    addToastGlobal({ type: 'error', title, message }),
+  warning: (title: string, message?: string) => 
+    addToastGlobal({ type: 'warning', title, message }),
+  info: (title: string, message?: string) => 
+    addToastGlobal({ type: 'info', title, message }),
+  dismiss: (id: string) => removeToastGlobal(id),
+  dismissAll: () => {
+    toastState = [];
+    notifyListeners();
+  },
+};
 
-  const addToast = useCallback((toast: Omit<Toast, 'id'>) => {
-    const id = `toast-${++toastId}`;
-    const newToast: Toast = { ...toast, id };
+/**
+ * Hook to access and manage toasts
+ */
+export function useToast() {
+  const [toasts, setToasts] = useState<Toast[]>(toastState);
+
+  useEffect(() => {
+    // Subscribe to toast changes
+    const listener = (newToasts: Toast[]) => setToasts(newToasts);
+    toastListeners.push(listener);
     
-    setToasts(prev => [...prev, newToast]);
+    // Sync initial state
+    setToasts([...toastState]);
     
-    // Auto-remove after duration
-    const duration = toast.duration ?? 5000;
-    if (duration > 0) {
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== id));
-      }, duration);
-    }
+    return () => {
+      toastListeners = toastListeners.filter(l => l !== listener);
+    };
+  }, []);
+
+  const addToast = useCallback((input: ToastInput) => {
+    return addToastGlobal(input);
   }, []);
 
   const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    removeToastGlobal(id);
   }, []);
 
-  const success = useCallback((message: string) => {
-    addToast({ type: 'success', message });
-  }, [addToast]);
+  const success = useCallback((title: string, message?: string) => {
+    return addToastGlobal({ type: 'success', title, message });
+  }, []);
 
-  const error = useCallback((message: string) => {
-    addToast({ type: 'error', message, duration: 7000 });
-  }, [addToast]);
+  const error = useCallback((title: string, message?: string) => {
+    return addToastGlobal({ type: 'error', title, message });
+  }, []);
 
-  const warning = useCallback((message: string) => {
-    addToast({ type: 'warning', message });
-  }, [addToast]);
+  const warning = useCallback((title: string, message?: string) => {
+    return addToastGlobal({ type: 'warning', title, message });
+  }, []);
 
-  const info = useCallback((message: string) => {
-    addToast({ type: 'info', message });
-  }, [addToast]);
+  const info = useCallback((title: string, message?: string) => {
+    return addToastGlobal({ type: 'info', title, message });
+  }, []);
 
-  return (
-    <ToastContext.Provider value={{ toasts, addToast, removeToast, success, error, warning, info }}>
-      {children}
-    </ToastContext.Provider>
-  );
+  return {
+    toasts,
+    addToast,
+    removeToast,
+    success,
+    error,
+    warning,
+    info,
+  };
 }
 
-export function useToast() {
-  const context = useContext(ToastContext);
-  
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  
-  return context;
-}
+// Legacy exports for compatibility
+export const setToastRef = () => {};
+export const ToastProvider = ({ children }: { children: React.ReactNode }) => children;
 
-/**
- * Standalone toast functions for use outside React components
- */
-let toastRef: ToastContextType | null = null;
-
-export function setToastRef(ref: ToastContextType) {
-  toastRef = ref;
-}
-
-export const toast = {
-  success: (message: string) => toastRef?.success(message),
-  error: (message: string) => toastRef?.error(message),
-  warning: (message: string) => toastRef?.warning(message),
-  info: (message: string) => toastRef?.info(message),
-};
+export default useToast;
