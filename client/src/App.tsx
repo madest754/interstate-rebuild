@@ -1,9 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 
 // Pages
-import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import CallForm from './pages/CallForm';
 import MembersPage from './pages/MembersPage';
@@ -19,7 +17,6 @@ import { OfflineBanner } from './components/ConnectionStatus';
 import { Toaster } from './components/ui/toaster';
 
 // Hooks
-import { useWebSocket } from './hooks/useWebSocket';
 import { usePrefetchReferenceData } from './hooks/useReferenceData';
 
 // Types
@@ -34,7 +31,7 @@ interface User {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: User;
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -42,20 +39,31 @@ interface AuthContextType {
   refetch: () => void;
 }
 
+// Default dispatcher user - full access, no login needed
+const DEFAULT_USER: User = {
+  id: 'default-user',
+  email: 'dispatcher@chaveirim.org',
+  role: 'dispatcher',
+  memberId: null,
+  firstName: 'Dispatcher',
+  lastName: '',
+  unitNumber: '000',
+};
+
 // Auth context
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  isLoading: true,
-  isAuthenticated: false,
-  isAdmin: false,
-  isDispatcher: false,
+  user: DEFAULT_USER,
+  isLoading: false,
+  isAuthenticated: true,
+  isAdmin: true,
+  isDispatcher: true,
   refetch: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 // Simple router state
-type Page = 'dashboard' | 'new-call' | 'members' | 'schedule' | 'admin' | 'settings' | 'call-edit';
+type Page = 'dashboard' | 'new-call' | 'call-edit' | 'members' | 'schedule' | 'admin' | 'settings';
 
 // Register service worker
 function registerServiceWorker() {
@@ -76,72 +84,43 @@ function registerServiceWorker() {
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [editCallId, setEditCallId] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
-  // Register service worker on mount
+  // Register service worker and mark ready
   useEffect(() => {
     registerServiceWorker();
+    // Small delay to ensure styles load
+    setTimeout(() => setIsReady(true), 100);
   }, []);
 
-  // Fetch current user
-  const { data: user, isLoading, refetch } = useQuery<User | null>({
-    queryKey: ['user'],
-    queryFn: async () => {
-      const res = await fetch('/api/user', { credentials: 'include' });
-      if (!res.ok) return null;
-      return res.json();
-    },
-    retry: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  // Prefetch reference data when user is authenticated
+  // Prefetch reference data
   usePrefetchReferenceData();
 
-  // Connect to WebSocket when authenticated
-  useWebSocket({ enabled: !!user });
-
-  // Compute auth values
-  const isAuthenticated = !!user;
-  const isAdmin = user?.role === 'admin';
-  const isDispatcher = user?.role === 'admin' || user?.role === 'dispatcher';
-
-  // Navigate to call edit
-  const handleEditCall = (callId: string) => {
-    setEditCallId(callId);
-    setCurrentPage('call-edit');
-  };
-
-  // Navigate back to dashboard
-  const handleBack = () => {
-    setEditCallId(null);
-    setCurrentPage('dashboard');
-  };
-
-  // Navigate to new call
+  // Navigation handlers
   const handleNewCall = () => {
     setEditCallId(null);
     setCurrentPage('new-call');
   };
 
-  // Loading state
-  if (isLoading) {
+  const handleEditCall = (callId: string) => {
+    setEditCallId(callId);
+    setCurrentPage('call-edit');
+  };
+
+  const handleBack = () => {
+    setEditCallId(null);
+    setCurrentPage('dashboard');
+  };
+
+  // Show brief loading
+  if (!isReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
-          <p className="mt-4 text-slate-600">Loading...</p>
+          <p className="mt-4 text-slate-600">Loading Dispatcher...</p>
         </div>
       </div>
-    );
-  }
-
-  // Not authenticated - show login
-  if (!user) {
-    return (
-      <ErrorBoundary>
-        <LoginPage onSuccess={refetch} />
-        <Toaster />
-      </ErrorBoundary>
     );
   }
 
@@ -151,15 +130,15 @@ export default function App() {
       case 'dashboard':
         return <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
       case 'new-call':
-        return isDispatcher ? <CallForm onBack={handleBack} /> : <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
+        return <CallForm onBack={handleBack} />;
       case 'call-edit':
-        return isDispatcher && editCallId ? <CallForm callId={editCallId} onBack={handleBack} /> : <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
+        return editCallId ? <CallForm callId={editCallId} onBack={handleBack} /> : <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
       case 'members':
         return <MembersPage />;
       case 'schedule':
         return <SchedulePage />;
       case 'admin':
-        return isAdmin ? <AdminPage /> : <Dashboard onEditCall={handleEditCall} onNewCall={handleNewCall} />;
+        return <AdminPage />;
       case 'settings':
         return <SettingsPage />;
       default:
@@ -169,16 +148,23 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <AuthContext.Provider value={{ user, isLoading, isAuthenticated, isAdmin, isDispatcher, refetch }}>
+      <AuthContext.Provider value={{ 
+        user: DEFAULT_USER, 
+        isLoading: false, 
+        isAuthenticated: true, 
+        isAdmin: true, 
+        isDispatcher: true, 
+        refetch: () => {} 
+      }}>
         <div className="min-h-screen bg-slate-50 flex flex-col">
           {/* Offline banner */}
           <OfflineBanner />
           
           {/* Top bar */}
           <TopBar 
-            user={user} 
+            user={DEFAULT_USER} 
             currentPage={currentPage}
-            onNavigate={setCurrentPage}
+            onNavigate={(page) => setCurrentPage(page as Page)}
           />
           
           {/* Main content */}
@@ -191,9 +177,9 @@ export default function App() {
           {/* Bottom navigation (mobile) */}
           <BottomNavigation 
             currentPage={currentPage}
-            onNavigate={setCurrentPage}
-            isDispatcher={isDispatcher}
-            isAdmin={isAdmin}
+            onNavigate={(page) => setCurrentPage(page as Page)}
+            isDispatcher={true}
+            isAdmin={true}
           />
           
           {/* Toast notifications */}
